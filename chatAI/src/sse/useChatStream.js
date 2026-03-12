@@ -17,7 +17,9 @@ export function useChatStream(chatId) {
   const lineBufferRef = useRef("");
 
   const appendMessage = useChatStore((s) => s.appendMessage);
-  const updateLastAssistantMessage = useChatStore((s) => s.updateLastAssistantMessage);
+  const updateLastAssistantMessage = useChatStore(
+    (s) => s.updateLastAssistantMessage,
+  );
   const setStreamingState = useChatStore((s) => s.setStreamingState);
 
   /** 将 buffer 中剩余内容一次性写入最后一条助手消息（流结束或中止时调用，避免内容被截断） */
