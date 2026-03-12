@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
-import { FixedSizeList as VirtualList } from "react-window";
+import { useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
@@ -12,20 +11,7 @@ export function ChatMessageList({
   autoScroll,
   isStreamingForThisChat,
 }) {
-  const listRef = useRef(null);
-
-  // 估算一条消息的大致高度（px），用于虚拟列表行高
-  const itemHeight = 80;
-
-  const itemData = useMemo(
-    () => ({
-      messages,
-      isStreamingForThisChat,
-    }),
-    [messages, isStreamingForThisChat]
-  );
-
-  // 自动滚动到底部（依赖外层容器）
+  // 自动滚动到底部
   useEffect(() => {
     if (!autoScroll) return;
     const container = scrollContainerRef.current;
@@ -45,72 +31,62 @@ export function ChatMessageList({
   }
 
   return (
-    <div style={{ padding: "16px 24px", height: "100%", boxSizing: "border-box" }}>
-      <VirtualList
-        ref={listRef}
-        height={scrollContainerRef.current?.clientHeight ?? 400}
-        itemCount={messages.length}
-        itemSize={itemHeight}
-        width="100%"
-        itemData={itemData}>
-        {({ index, style, data }) => {
-          const msg = data.messages[index];
-          const isUser = msg.role === "user";
-          const isLastMessage = index === data.messages.length - 1;
-          const showLoading =
-            isLastMessage &&
-            !isUser &&
-            data.isStreamingForThisChat &&
-            !(msg.content ?? "").trim();
-
-          return (
-            <div
-              style={style}
-              className={isUser ? "msg-row user" : "msg-row assistant"}>
-              <div className="msg-bubble">
-                {showLoading ? (
-                  <div className="chat-loading" aria-label="正在思考">
-                    <span className="chat-loading-dot" />
-                    <span className="chat-loading-dot" />
-                    <span className="chat-loading-dot" />
-                  </div>
-                ) : (
-                  <>
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      components={{
-                        code({ inline, className, children, ...props }) {
-                          const match = /language-(\w+)/.exec(className || "");
-                          return !inline && match ? (
-                            <SyntaxHighlighter
-                              {...props}
-                              style={oneDark}
-                              language={match[1]}
-                              PreTag="div">
-                              {String(children).replace(/\n$/, "")}
-                            </SyntaxHighlighter>
-                          ) : (
-                            <code className={className} {...props}>
-                              {children}
-                            </code>
-                          );
-                        },
-                      }}>
-                      {msg.content || ""}
-                    </ReactMarkdown>
-                    {isLastMessage &&
-                      !isUser &&
-                      data.isStreamingForThisChat &&
-                      (msg.content ?? "").trim() && (
-                        <span className="chat-typing-cursor" aria-hidden />
-                      )}
-                  </>
-                )}
-              </div>
+    <div style={{ padding: "16px 24px" }}>
+      {messages.map((msg, index) => {
+        const isUser = msg.role === "user";
+        const isLastMessage = index === messages.length - 1;
+        const showLoading =
+          isLastMessage &&
+          !isUser &&
+          isStreamingForThisChat &&
+          !(msg.content ?? "").trim();
+        return (
+          <div
+            key={msg.id}
+            className={isUser ? "msg-row user" : "msg-row assistant"}>
+            <div className="msg-bubble">
+              {showLoading ? (
+                <div className="chat-loading" aria-label="正在思考">
+                  <span className="chat-loading-dot" />
+                  <span className="chat-loading-dot" />
+                  <span className="chat-loading-dot" />
+                </div>
+              ) : (
+                <>
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      code({ inline, className, children, ...props }) {
+                        const match = /language-(\w+)/.exec(className || "");
+                        return !inline && match ? (
+                          <SyntaxHighlighter
+                            {...props}
+                            style={oneDark}
+                            language={match[1]}
+                            PreTag="div">
+                            {String(children).replace(/\n$/, "")}
+                          </SyntaxHighlighter>
+                        ) : (
+                          <code className={className} {...props}>
+                            {children}
+                          </code>
+                        );
+                      },
+                    }}>
+                    {msg.content || ""}
+                  </ReactMarkdown>
+                  {isLastMessage &&
+                    !isUser &&
+                    isStreamingForThisChat &&
+                    (msg.content ?? "").trim() && (
+                      <span className="chat-typing-cursor" aria-hidden />
+                    )}
+                </>
+              )}
             </div>
-          );
-        }}
-      </VirtualList>
+          </div>
+        );
+      })}
     </div>
   );
 }
