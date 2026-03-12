@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
@@ -11,6 +11,34 @@ export function ChatMessageList({
   autoScroll,
   isStreamingForThisChat,
 }) {
+  const [viewportHeight, setViewportHeight] = useState(0);
+  const [scrollTop, setScrollTop] = useState(0);
+
+  // 监听外层滚动容器，记录滚动位置和可视区域高度，用于虚拟列表计算
+  useEffect(() => {
+    const container = scrollContainerRef?.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      setScrollTop(container.scrollTop);
+    };
+
+    const handleResize = () => {
+      setViewportHeight(container.clientHeight);
+    };
+
+    // 初始化一次高度
+    handleResize();
+
+    container.addEventListener("scroll", handleScroll);
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      container.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, [scrollContainerRef]);
+
   // 自动滚动到底部
   useEffect(() => {
     if (!autoScroll) return;
@@ -30,11 +58,50 @@ export function ChatMessageList({
     );
   }
 
+  // 当消息较多时启用虚拟列表，只渲染可视区附近的消息
+  const shouldVirtualize = viewportHeight > 0 && messages.length > 50;
+
+  const itemHeight = 80; // 预估每条消息高度（像素），用于计算可视范围
+  const overscanCount = 5; // 上下各多渲染几条，减少滚动抖动
+
+  let startIndex = 0;
+  let endIndex = messages.length;
+  let topPaddingHeight = 0;
+  let bottomPaddingHeight = 0;
+
+  if (shouldVirtualize) {
+    const totalItems = messages.length;
+    const visibleCount =
+      Math.ceil(viewportHeight / itemHeight) + overscanCount * 2;
+
+    startIndex = Math.max(
+      0,
+      Math.floor(scrollTop / itemHeight) - overscanCount
+    );
+    endIndex = Math.min(totalItems, startIndex + visibleCount);
+
+    const totalHeight = totalItems * itemHeight;
+    const renderedItems = endIndex - startIndex;
+
+    topPaddingHeight = startIndex * itemHeight;
+    bottomPaddingHeight =
+      totalHeight - topPaddingHeight - renderedItems * itemHeight;
+  }
+
+  const visibleMessages = shouldVirtualize
+    ? messages.slice(startIndex, endIndex)
+    : messages;
+
   return (
     <div style={{ padding: "16px 24px" }}>
-      {messages.map((msg, index) => {
+      {shouldVirtualize && topPaddingHeight > 0 ? (
+        <div style={{ height: topPaddingHeight }} />
+      ) : null}
+
+      {visibleMessages.map((msg, i) => {
+        const realIndex = shouldVirtualize ? startIndex + i : i;
         const isUser = msg.role === "user";
-        const isLastMessage = index === messages.length - 1;
+        const isLastMessage = realIndex === messages.length - 1;
         const showLoading =
           isLastMessage &&
           !isUser &&
@@ -87,6 +154,10 @@ export function ChatMessageList({
           </div>
         );
       })}
+
+      {shouldVirtualize && bottomPaddingHeight > 0 ? (
+        <div style={{ height: bottomPaddingHeight }} />
+      ) : null}
     </div>
   );
 }
